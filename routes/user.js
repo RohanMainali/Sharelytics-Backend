@@ -44,6 +44,20 @@ router.put('/watchlist', authenticateToken, async (req, res) => {
   }
 });
 
+// Delete a symbol from watchlist
+router.delete('/watchlist/:symbol', authenticateToken, async (req, res) => {
+  const { symbol } = req.params;
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    user.watchlist = user.watchlist.filter(s => s !== symbol);
+    await user.save();
+    res.json({ watchlist: user.watchlist });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Get portfolio
 router.get('/portfolio', authenticateToken, async (req, res) => {
   try {
@@ -57,14 +71,28 @@ router.get('/portfolio', authenticateToken, async (req, res) => {
 
 // Update portfolio
 router.put('/portfolio', authenticateToken, async (req, res) => {
-  const { portfolio } = req.body;
+  let { portfolio } = req.body;
   try {
-    const user = await User.findByIdAndUpdate(
-      req.userId,
-      { portfolio },
-      { new: true }
-    );
+    // Remove any client-generated id fields, let MongoDB assign _id
+    portfolio = portfolio.map(({ id, ...rest }) => rest);
+    const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
+    user.portfolio = portfolio;
+    await user.save();
+    res.json({ portfolio: user.portfolio });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Delete an entry from portfolio (by MongoDB _id)
+router.delete('/portfolio/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    user.portfolio = user.portfolio.filter(entry => entry._id.toString() !== id);
+    await user.save();
     res.json({ portfolio: user.portfolio });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
